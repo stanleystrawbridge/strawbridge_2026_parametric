@@ -1,0 +1,18 @@
+Figure: E_vary_pi
+Varied parameter: pi
+
+Fixed parameters:
+  t0 = 0.0
+  lambda = 1.0
+  k = 1.0
+
+Varied values:
+  Curve 1: pi = 0.2, color = #0072bd
+  Curve 2: pi = 0.4, color = #366a94
+  Curve 3: pi = 0.6, color = #6c626b
+  Curve 4: pi = 0.8, color = #a35b42
+  Curve 5: pi = 1.0, color = #d95319
+
+Time range:
+  t from 0 to 6.0
+  number of time points = 1400
