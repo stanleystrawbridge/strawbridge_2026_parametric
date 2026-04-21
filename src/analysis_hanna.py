@@ -2,15 +2,15 @@
 # Hanna 2009 Nature
 # DOI: 10.1038/nature08592
 # Data from Figure 4D
-
+#
 # For each condition, fit a Weibull fraction model,
 # compare characteristic timescale (lam), timing (t50),
-# and synchronicity (k) across ALL pairs (post-hoc BH FDR),
+# and synchronicity (k) across all pairs (post-hoc BH FDR),
 # and plot empirical data with overlaid model curves.
 #
 # NOTE:
-#   - t0 is FIXED to 0.0
-#   - pi is FIXED to 1.0
+#   - t0 is fixed to 0.0
+#   - pi is fixed to 1.0
 
 import os
 from pathlib import Path
@@ -23,6 +23,7 @@ from scipy.stats import norm
 
 from cstk_fit import fit_weibull, fraction_population
 
+
 # -----------------------
 # Config
 # -----------------------
@@ -30,12 +31,12 @@ DATA_PATH = os.path.join("data", "hanna2009nature.csv")
 OUT_DIR = Path("hanna2009nature")
 OUT_DIR.mkdir(exist_ok=True)
 
-# Column-name heuristics (case-insensitive contains). Override if needed.
+# Column-name heuristics (case-insensitive substring match)
 CAND_TIME = ["time", "t", "hours", "hour", "h"]
 CAND_COND = ["condition", "genotype", "cell_line", "cell line", "line", "group"]
-CAND_VAL  = ["fraction", "value", "y", "mean", "percentage", "percent", "prop", "proportion"]
+CAND_VAL = ["fraction", "value", "y", "mean", "percentage", "percent", "prop", "proportion"]
 
-# Used only for coloring/legend ordering
+# Used only for colouring and legend ordering
 BASELINE_CONTAINS = ["NGFP1"]
 
 ALPHA = 0.05
@@ -45,7 +46,7 @@ ALPHA = 0.05
 # Helpers
 # -----------------------
 def find_column(df: pd.DataFrame, candidates) -> str:
-    """Return the first column whose lowercase name contains any candidate token."""
+    """Return the first column whose lowercase name matches any candidate token."""
     cols = {c.lower(): c for c in df.columns}
     for cand in candidates:
         for lc, original in cols.items():
@@ -59,21 +60,25 @@ def find_column(df: pd.DataFrame, candidates) -> str:
 
 def normalize_to_unit(y: np.ndarray) -> np.ndarray:
     """
-    If values already in [0,1], return as-is.
-    If values look like percentages (0..100-ish), divide by 100.
-    Otherwise raise.
+    Return values in [0,1].
+
+    If values already lie in [0,1], return as-is.
+    If values look like percentages, divide by 100.
+    Otherwise raise an error.
     """
     y = y.astype(float)
     mmin, mmax = np.nanmin(y), np.nanmax(y)
+
     if (mmin >= -1e-9) and (mmax <= 1.0 + 1e-9):
         return y
     if mmax <= 120.0 and mmin >= -1.0:
         return y / 100.0
+
     raise ValueError("Values are not in [0,1] and do not look like percentages (0..100).")
 
 
 def pick_baseline_label(levels) -> str:
-    """Pick the first level that contains all strings in BASELINE_CONTAINS; else return the first level."""
+    """Pick the baseline label using BASELINE_CONTAINS; otherwise return the first level."""
     for lev in levels:
         if all(k.lower() in lev.lower() for k in BASELINE_CONTAINS):
             return lev
@@ -83,32 +88,40 @@ def pick_baseline_label(levels) -> str:
 def var_t50_from_cov_fixed_t0(p: dict, cov: np.ndarray, fitted_keys) -> float:
     """
     Delta-method variance of t50 when t0 is fixed to 0:
+
         t50 = lam * (ln 2)^(1/k)
+
     Only lam and k enter the gradient.
     """
     if cov is None:
         return np.nan
+
     try:
         ln2 = np.log(2.0)
         g_full = {
             "lam": ln2 ** (1.0 / p["k"]),
-            "k":   p["lam"] * (ln2 ** (1.0 / p["k"])) * (-(np.log(ln2)) / (p["k"] ** 2)),
+            "k": p["lam"] * (ln2 ** (1.0 / p["k"])) * (-(np.log(ln2)) / (p["k"] ** 2)),
         }
+
         grad_keys = [k for k in fitted_keys if k in ("lam", "k")]
         if not grad_keys:
             return np.nan
+
         g = np.array([g_full[k] for k in grad_keys], float)
         idx = [fitted_keys.index(k) for k in grad_keys]
         C = np.asarray(cov)[np.ix_(idx, idx)]
+
         return float(g @ C @ g)
+
     except Exception:
         return np.nan
 
 
 def extract_se(param_name: str, cov: np.ndarray, fitted_keys) -> float:
-    """Return the standard error for a scalar parameter from the covariance matrix."""
+    """Return the standard error for one fitted parameter."""
     if (cov is None) or (param_name not in fitted_keys):
         return np.nan
+
     try:
         i = fitted_keys.index(param_name)
         v = float(np.asarray(cov)[i, i])
@@ -119,11 +132,12 @@ def extract_se(param_name: str, cov: np.ndarray, fitted_keys) -> float:
 
 def wald_p_from_diff(diff: float, se: float):
     """
-    Two-sided Wald p-value (normal approx) using a high-precision tail.
+    Two-sided Wald p-value from a normal approximation.
     Returns (p, z). If se is invalid, returns (nan, nan).
     """
     if not np.isfinite(se) or se <= 0:
         return np.nan, np.nan
+
     z = diff / se
     p = 2.0 * norm.sf(abs(z))
     return p, z
@@ -132,7 +146,7 @@ def wald_p_from_diff(diff: float, se: float):
 def bh_fdr(pvals: np.ndarray) -> np.ndarray:
     """
     Benjamini–Hochberg FDR adjustment.
-    Returns q-values (same shape as pvals), preserving NaNs.
+    Returns q-values with NaNs preserved.
     """
     p = np.array([pv if np.isfinite(pv) else np.nan for pv in pvals], dtype=float)
     m = np.sum(np.isfinite(p))
@@ -154,11 +168,10 @@ def bh_fdr(pvals: np.ndarray) -> np.ndarray:
 
 def pairwise_wald(df_sum, value_col, se_col, label_col="condition"):
     """
-    Build a pairwise comparison table using Wald z-tests:
-      diff = a - b
-      se_diff = sqrt(se_a^2 + se_b^2)  (independent fits)
-      p_two_sided = 2*sf(|z|)
-    Returns a DataFrame with BH-adjusted q-values and an FDR flag.
+    Build a pairwise comparison table using Wald z-tests.
+
+    diff = a - b
+    se_diff = sqrt(se_a^2 + se_b^2), assuming independent fits
     """
     rows = []
     labels = list(df_sum[label_col])
@@ -196,31 +209,31 @@ def pairwise_wald(df_sum, value_col, se_col, label_col="condition"):
 
 
 # -----------------------
-# Load & tidy data
+# Load and tidy data
 # -----------------------
 df = pd.read_csv(DATA_PATH)
 
 time_col = find_column(df, CAND_TIME)
 cond_col = find_column(df, CAND_COND)
-val_col  = find_column(df, CAND_VAL)
+val_col = find_column(df, CAND_VAL)
 
 df = df[[time_col, cond_col, val_col]].rename(
     columns={time_col: "time", cond_col: "condition", val_col: "value"}
 )
 
-# Convert to fractions if needed
+# Convert values to fractions if needed
 df["value"] = normalize_to_unit(df["value"].values)
 df = df.dropna(subset=["time", "condition", "value"]).copy()
 df["time"] = df["time"].astype(float)
 df["condition"] = df["condition"].astype(str)
 
 conditions = df["condition"].unique()
-baseline = pick_baseline_label(conditions)  # for colors/legend only
+baseline = pick_baseline_label(conditions)  # used only for colouring/legend
 print(f"Baseline (for legend) = '{baseline}'")
 
 
 # -----------------------
-# Fit per condition (t0 FIXED=0, pi=1)
+# Fit per condition (t0 fixed to 0, pi fixed to 1)
 # -----------------------
 rows = []
 
@@ -229,22 +242,23 @@ for cond, sub in df.groupby("condition"):
     y = sub["value"].to_numpy(float)
 
     fit = fit_weibull(
-        t, y,
+        t,
+        y,
         yerr=None,
         robust=True,
         return_cov=True,
-        fix_t0=0.0,   # t0 fixed at 0
-        fix_pi=1.0,   # maximal fraction fixed at 1
+        fix_t0=0.0,
+        fix_pi=1.0,
     )
 
     p = fit.params
-    fitted_keys = ["lam", "k"]  # free params when t0 and pi are fixed
+    fitted_keys = ["lam", "k"]  # free parameters when t0 and pi are fixed
 
-    # SEs
-    lam_se  = extract_se("lam", fit.cov, fitted_keys)
+    # Standard errors
+    lam_se = extract_se("lam", fit.cov, fitted_keys)
     var_t50 = var_t50_from_cov_fixed_t0(p, fit.cov, fitted_keys)
-    t50_se  = np.sqrt(var_t50) if (np.isfinite(var_t50) and var_t50 >= 0) else np.nan
-    k_se    = extract_se("k", fit.cov, fitted_keys)
+    t50_se = np.sqrt(var_t50) if (np.isfinite(var_t50) and var_t50 >= 0) else np.nan
+    k_se = extract_se("k", fit.cov, fitted_keys)
 
     rows.append({
         "condition": cond,
@@ -275,11 +289,11 @@ print("Saved:", OUT_DIR / "hanna2009nature_fit_summary.csv")
 # -----------------------
 lam_pairs = pairwise_wald(summary, value_col="lam", se_col="lam_se", label_col="condition")
 t50_pairs = pairwise_wald(summary, value_col="t50", se_col="t50_se", label_col="condition")
-k_pairs   = pairwise_wald(summary, value_col="k",   se_col="k_se",   label_col="condition")
+k_pairs = pairwise_wald(summary, value_col="k", se_col="k_se", label_col="condition")
 
 lam_pairs.to_csv(OUT_DIR / "hanna2009nature_pairwise_lam.csv", index=False)
 t50_pairs.to_csv(OUT_DIR / "hanna2009nature_pairwise_t50.csv", index=False)
-k_pairs.to_csv(OUT_DIR / "hanna2009nature_pairwise_k.csv",   index=False)
+k_pairs.to_csv(OUT_DIR / "hanna2009nature_pairwise_k.csv", index=False)
 
 print("Saved:", OUT_DIR / "hanna2009nature_pairwise_lam.csv")
 print("Saved:", OUT_DIR / "hanna2009nature_pairwise_t50.csv")
@@ -287,16 +301,16 @@ print("Saved:", OUT_DIR / "hanna2009nature_pairwise_k.csv")
 
 
 # -----------------------
-# Plot settings and colors
+# Plot settings and colours
 # -----------------------
 xmin, xmax = 0.0, 60.0
 ymin, ymax = 0.0, 1.0
 tgrid = np.linspace(xmin, xmax, 600)
 
-# Color rules:
-#   NGFP1             → black
-#   (contains) lin28  → nice blue
-#   all other NGFP1-* → shades of orange (cycled safely)
+# Colour rules:
+#   NGFP1             -> black
+#   contains lin28    -> blue
+#   all other NGFP1-* -> orange shades
 nice_blue = "#1976d2"
 from matplotlib.cm import get_cmap
 oranges = get_cmap("Oranges")
@@ -305,6 +319,7 @@ orange_iter = cycle(orange_palette)
 
 
 def color_for(cond: str, baseline_label: str = "NGFP1") -> str:
+    """Assign a plotting colour to each condition."""
     cl = cond.strip().lower()
     if cl == baseline_label.strip().lower():
         return "#000000"
@@ -315,6 +330,7 @@ def color_for(cond: str, baseline_label: str = "NGFP1") -> str:
 
 cond_colors = {cond: color_for(cond, baseline_label=baseline) for cond in summary["condition"]}
 
+
 # -----------------------
 # Plot
 # -----------------------
@@ -323,17 +339,33 @@ fig, ax = plt.subplots(figsize=(5.0, 5.0), dpi=400)
 for cond, sub in df.groupby("condition"):
     c = cond_colors[cond]
 
-    # empirical markers
-    ax.plot(sub["time"], sub["value"], "o", ms=6.5, mfc="none", mec=c, mew=1.8, alpha=0.95, zorder=3)
+    # Empirical markers
+    ax.plot(
+        sub["time"], sub["value"],
+        "o",
+        ms=6.5,
+        mfc="none",
+        mec=c,
+        mew=1.8,
+        alpha=0.95,
+        zorder=3,
+    )
 
-    # model curve
+    # Model curve
     p = summary.loc[summary["condition"] == cond].iloc[0]
     yfit = fraction_population(tgrid, p["t0"], p["lam"], p["k"], p["pi"])
-    ax.plot(tgrid, yfit, color=c, lw=2.6, alpha=0.95, zorder=2, label=cond)
+    ax.plot(
+        tgrid, yfit,
+        color=c,
+        lw=2.6,
+        alpha=0.95,
+        zorder=2,
+        label=cond,
+    )
 
 ax.set_title("Reprogramming Kinetics", fontsize=14, weight="bold")
 
-# Ordered legend: baseline → lin28 → others (alphabetical)
+# Legend order: baseline -> lin28 -> others alphabetically
 legend_order = []
 legend_order += [c for c in summary["condition"] if c.strip().lower() == baseline.strip().lower()]
 legend_order += [c for c in summary["condition"] if "lin28" in c.lower()]
@@ -364,6 +396,7 @@ fig.tight_layout()
 fig.savefig(OUT_DIR / "hanna2009nature_all_conditions.png")
 fig.savefig(OUT_DIR / "hanna2009nature_all_conditions.svg")
 plt.close(fig)
+
 
 # -----------------------
 # Console summaries
