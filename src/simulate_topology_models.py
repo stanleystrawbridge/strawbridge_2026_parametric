@@ -1,24 +1,11 @@
 # simulate_topology_models.py
 #
-# Updated to:
-# - increase simulations substantially
-# - use wider bins for hazard estimation
-# - smooth more strongly
-# - make theoretical curves more visually prominent
-# - tune decreasing-hazard model to be more cleanly monotone
-# - improve constant-hazard empirical estimate
-# - add empirical CDF error bounds
-#
-# Models:
-#   Constant hazard:   S -> T
-#   Increasing hazard: S0 -> S1 -> S2 -> S3 -> T
-#   Decreasing hazard: S -> T, S -> R, R -> T
-#
-# Output folder:
-#   topologyModelFigures
-
+# Simulate three minimal transition topologies, estimate empirical cumulative
+# distribution and hazard functions, fit delayed Weibull curves, and save the
+# resulting figures and summary files in a local "topologyModelFigures" folder.
 
 import os
+
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
@@ -26,7 +13,7 @@ from scipy.stats import gamma
 
 
 # ---------------------------
-# Style
+# Plot style
 # ---------------------------
 plt.rcParams["font.family"] = "Arial"
 plt.rcParams["font.size"] = 14
@@ -34,23 +21,27 @@ plt.rcParams["axes.linewidth"] = 1.0
 
 
 # ---------------------------
-# Helpers
+# General helpers
 # ---------------------------
 def ensure_dir(path):
+    """Create a directory if it does not already exist."""
     os.makedirs(path, exist_ok=True)
 
 
 def lighten_color(rgb, factor=0.88):
+    """Lighten an RGB colour by mixing it toward white."""
     rgb = np.array(rgb, dtype=float)
     return tuple(1.0 - factor * (1.0 - rgb))
 
 
 def darken_color(rgb, factor=0.62):
+    """Darken an RGB colour by scaling it toward black."""
     rgb = np.array(rgb, dtype=float)
     return tuple(factor * rgb)
 
 
 def weibull_cdf(t, lam, k):
+    """Standard Weibull cumulative distribution function."""
     t = np.asarray(t, dtype=float)
     out = np.zeros_like(t)
     mask = t >= 0
@@ -59,19 +50,20 @@ def weibull_cdf(t, lam, k):
 
 
 def empirical_cdf(times, t_grid):
+    """Compute the empirical CDF of first-passage times on a fixed grid."""
     times = np.asarray(times)
     return np.searchsorted(np.sort(times), t_grid, side="right") / len(times)
 
 
 def empirical_cdf_with_ci(times, t_grid, alpha=0.05):
     """
-    Empirical CDF with simple pointwise binomial 95% confidence intervals.
+    Compute the empirical CDF with pointwise normal-approximation confidence bands.
     """
     F_emp = empirical_cdf(times, t_grid)
     n = len(times)
 
     se = np.sqrt(F_emp * (1.0 - F_emp) / n)
-    z = 1.96  # for 95% CI
+    z = 1.96  # 95% interval
 
     F_lo = np.clip(F_emp - z * se, 0.0, 1.0)
     F_hi = np.clip(F_emp + z * se, 0.0, 1.0)
@@ -80,6 +72,7 @@ def empirical_cdf_with_ci(times, t_grid, alpha=0.05):
 
 
 def gaussian_kernel(size, sigma):
+    """Return a normalized one-dimensional Gaussian kernel."""
     x = np.arange(size) - (size - 1) / 2
     g = np.exp(-(x**2) / (2 * sigma**2))
     g /= np.sum(g)
@@ -87,12 +80,14 @@ def gaussian_kernel(size, sigma):
 
 
 def smooth_1d(y, sigma=3):
+    """Smooth a one-dimensional array by Gaussian convolution."""
     size = int(np.ceil(6 * sigma)) | 1
     kernel = gaussian_kernel(size, sigma)
     return np.convolve(y, kernel, mode="same")
 
 
 def fit_weibull_to_cdf(times, t_grid=None):
+    """Fit a Weibull CDF to an empirical CDF by nonlinear least squares."""
     times = np.asarray(times)
     if t_grid is None:
         t_grid = np.linspace(0, np.percentile(times, 99.5), 400)
@@ -118,7 +113,9 @@ def fit_weibull_to_cdf(times, t_grid=None):
 
 def estimate_hazard_with_ci(times, t_max, n_bins=90, smooth_sigma=6.0, min_risk=5000):
     """
-    Wider bins + stronger smoothing + tail truncation.
+    Estimate a piecewise hazard function with smoothed confidence bands.
+
+    The estimate is truncated once the risk set falls below min_risk.
     """
     times = np.asarray(times)
     edges = np.linspace(0, t_max, n_bins + 1)
@@ -167,15 +164,17 @@ def estimate_hazard_with_ci(times, t_max, n_bins=90, smooth_sigma=6.0, min_risk=
 
 
 # ---------------------------
-# Models
+# Stochastic models
 # ---------------------------
 def simulate_constant_hazard(n, r=1.0, rng=None):
+    """Simulate first-passage times for the one-step topology S -> T."""
     if rng is None:
         rng = np.random.default_rng()
     return rng.exponential(scale=1.0 / r, size=n)
 
 
 def simulate_increasing_hazard(n, rates=(0.7, 0.9, 1.1, 1.3), rng=None):
+    """Simulate first-passage times for the sequential topology S0 -> S1 -> S2 -> S3 -> T."""
     if rng is None:
         rng = np.random.default_rng()
     x1 = rng.exponential(scale=1.0 / rates[0], size=n)
@@ -187,7 +186,8 @@ def simulate_increasing_hazard(n, rates=(0.7, 0.9, 1.1, 1.3), rng=None):
 
 def simulate_decreasing_hazard(n, r_transition=2.2, r_adapt=1.6, r_refractory=0.025, rng=None):
     """
-    Tuned so the theoretical hazard is more cleanly front-loaded then decreasing.
+    Simulate first-passage times for the competing-pathway topology
+    S -> T, S -> R, R -> T.
     """
     if rng is None:
         rng = np.random.default_rng()
@@ -206,17 +206,22 @@ def simulate_decreasing_hazard(n, r_transition=2.2, r_adapt=1.6, r_refractory=0.
 
 
 # ---------------------------
-# Theory
+# Theory curves
 # ---------------------------
 def theoretical_constant_cdf(t, r):
+    """Exact CDF for the one-step topology."""
     return 1.0 - np.exp(-r * t)
 
 
 def theoretical_constant_hazard(t, r):
+    """Exact hazard for the one-step topology."""
     return np.full_like(t, r, dtype=float)
 
 
 def theoretical_increasing_cdf(t, rates):
+    """
+    Approximate CDF for the sequential topology using a moment-matched gamma distribution.
+    """
     rates = np.array(rates, dtype=float)
     if np.allclose(rates, rates[0]):
         return gamma.cdf(t, a=len(rates), scale=1.0 / rates[0])
@@ -229,6 +234,9 @@ def theoretical_increasing_cdf(t, rates):
 
 
 def theoretical_increasing_hazard(t, rates):
+    """
+    Approximate hazard for the sequential topology using a moment-matched gamma distribution.
+    """
     rates = np.array(rates, dtype=float)
     if np.allclose(rates, rates[0]):
         pdf = gamma.pdf(t, a=len(rates), scale=1.0 / rates[0])
@@ -248,6 +256,7 @@ def theoretical_increasing_hazard(t, rates):
 
 
 def theoretical_decreasing_cdf(t, r_transition, r_adapt, r_refractory):
+    """Exact CDF for the competing-pathway topology."""
     a = r_transition
     b = r_adapt
     c = r_refractory
@@ -266,6 +275,7 @@ def theoretical_decreasing_cdf(t, r_transition, r_adapt, r_refractory):
 
 
 def theoretical_decreasing_hazard(t, r_transition, r_adapt, r_refractory):
+    """Exact hazard for the competing-pathway topology."""
     a = r_transition
     b = r_adapt
     c = r_refractory
@@ -290,6 +300,7 @@ def theoretical_decreasing_hazard(t, r_transition, r_adapt, r_refractory):
 # Plotting
 # ---------------------------
 def make_combined_cdf_figure(results, output_dir):
+    """Plot empirical and fitted CDF curves for all topologies."""
     fig, ax = plt.subplots(figsize=(7.0, 5.5))
 
     base_colours = {
@@ -328,6 +339,7 @@ def make_combined_cdf_figure(results, output_dir):
 
 
 def make_combined_hazard_figure(results, output_dir):
+    """Plot empirical and fitted hazard curves for all topologies."""
     fig, ax = plt.subplots(figsize=(7.0, 5.5))
 
     base_colours = {
@@ -344,9 +356,11 @@ def make_combined_hazard_figure(results, output_dir):
         ax.plot(res["haz_t"], res["haz_emp"], linewidth=2.0, color=emp_col, label=label)
         ax.plot(res["haz_t"], res["haz_theory"], linewidth=3.0, linestyle="--", color=theo_col)
 
-    x_max = min(results["Constant hazard (S→T)"]["haz_t"][-1],
-                results["Increasing hazard (S0→S1→S2→S3→T)"]["haz_t"][-1],
-                results["Decreasing hazard (S→R→T)"]["haz_t"][-1])
+    x_max = min(
+        results["Constant hazard (S→T)"]["haz_t"][-1],
+        results["Increasing hazard (S0→S1→S2→S3→T)"]["haz_t"][-1],
+        results["Decreasing hazard (S→R→T)"]["haz_t"][-1],
+    )
 
     ax.grid(True)
     ax.set_xlim(0, x_max)
@@ -366,26 +380,24 @@ def make_combined_hazard_figure(results, output_dir):
 # Main
 # ---------------------------
 def main():
+    """Run stochastic simulations, fit Weibull curves, and save figures and summaries."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     output_dir = os.path.join(script_dir, "topologyModelFigures")
     ensure_dir(output_dir)
 
     rng = np.random.default_rng(42)
 
-    # Increased simulations
     n_sim = 100_000_000
     t_max = 10.0
 
-    # Parameters
+    # Model parameters
     r_const = 1.0
     rates_inc = (0.7, 0.9, 1.1, 1.3)
-
-    # Tuned decreasing-hazard parameters
     r_tr = 2.2
     r_ad = 1.6
     r_ref = 0.025
 
-    # Simulate
+    # Simulate first-passage times
     times_constant = simulate_constant_hazard(n=n_sim, r=r_const, rng=rng)
     times_increasing = simulate_increasing_hazard(n=n_sim, rates=rates_inc, rng=rng)
     times_decreasing = simulate_decreasing_hazard(
@@ -422,9 +434,9 @@ def main():
         haz_est = estimate_hazard_with_ci(
             times,
             t_max=t_max,
-            n_bins=501,          # wider bins
-            smooth_sigma=6.0,   # stronger smoothing
-            min_risk=0,      # truncate unstable tail
+            n_bins=501,
+            smooth_sigma=6.0,
+            min_risk=0,
         )
 
         hz_theory = np.interp(haz_est["t"], t_grid, hz_theory_full)
