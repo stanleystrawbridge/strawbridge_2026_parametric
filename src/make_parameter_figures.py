@@ -1,21 +1,7 @@
 # make_parameter_figures.py
 #
-# Save this script in:
-# H:\Shared drives\strawbridge_lab\projects\smith_group\networkFailureAnalysis\src
-#
-# It will create:
-# H:\Shared drives\strawbridge_lab\projects\smith_group\networkFailureAnalysis\src\parameterFigures
-#
-# and save PNG, SVG, and TXT summary files for panels B-E.
-#
-# Updated version:
-# - no legend
-# - common x-range across all panels
-# - common y-range
-# - slightly refined parameter values
-# - more informative k sampling
-# - same blue->orange gradient style
-# - Arial font, grid on, no title, no axis labels
+# Generate parameter-sweep figures for the delayed Weibull model and save
+# PNG, SVG, and text summary files in a local "parameterFigures" folder.
 
 import os
 import numpy as np
@@ -24,7 +10,7 @@ from matplotlib.colors import to_hex
 
 
 # ---------------------------
-# Style
+# Plot style
 # ---------------------------
 plt.rcParams["font.family"] = "Arial"
 plt.rcParams["font.size"] = 14
@@ -39,7 +25,7 @@ def delayed_weibull_cdf(t, t0, lam, k, pi):
     Delayed Weibull CDF with competence fraction pi.
 
     F(t) = 0,                                   t < t0
-         = pi * [1 - exp(-((t - t0)/lam)^k)],  t >= t0
+         = pi * [1 - exp(-((t - t0) / lam)^k)], t >= t0
     """
     t = np.asarray(t)
     F = np.zeros_like(t, dtype=float)
@@ -51,12 +37,10 @@ def delayed_weibull_cdf(t, t0, lam, k, pi):
 
 
 # ---------------------------
-# Color utilities
+# Colour utilities
 # ---------------------------
 def interpolate_colors(color1, color2, n):
-    """
-    Linear interpolation between two RGB colors.
-    """
+    """Linearly interpolate between two RGB colours."""
     color1 = np.array(color1, dtype=float)
     color2 = np.array(color2, dtype=float)
 
@@ -77,7 +61,7 @@ MATLAB_ORANGE = (0.8500, 0.3250, 0.0980)
 
 
 # ---------------------------
-# Plot/save helper
+# Plot and save helper
 # ---------------------------
 def save_parameter_figure(
     output_dir,
@@ -89,7 +73,7 @@ def save_parameter_figure(
     n_t=1400,
 ):
     """
-    Make one figure, save PNG/SVG, and write TXT summary.
+    Create one parameter-sweep figure and save PNG, SVG, and TXT outputs.
     """
     os.makedirs(output_dir, exist_ok=True)
 
@@ -98,7 +82,7 @@ def save_parameter_figure(
 
     fig, ax = plt.subplots(figsize=(6.0, 5.0))
 
-    # Plot curves
+    # Plot one curve for each value of the varied parameter
     for value, color in zip(varied_values, colors):
         params = fixed_params.copy()
         params[varied_name] = value
@@ -113,26 +97,20 @@ def save_parameter_figure(
 
         ax.plot(t, F, color=color, linewidth=2.8)
 
-    # Axes style
+    # Apply common axis styling
     ax.grid(True)
     ax.set_xlim(0, t_max)
     ax.set_ylim(0, 1.05)
-
-    # No title, no axis labels
     ax.set_title("")
     ax.set_xlabel("")
     ax.set_ylabel("")
-
-    # Keep ticks
     ax.tick_params(direction="out", length=4, width=1)
-
-    # Make x ticks uniform and readable
     ax.set_xticks(np.arange(0, t_max + 0.001, 1.0))
     ax.set_yticks(np.arange(0, 1.01, 0.2))
 
     fig.tight_layout()
 
-    # Save figure
+    # Output paths
     png_path = os.path.join(output_dir, f"{base_name}.png")
     svg_path = os.path.join(output_dir, f"{base_name}.svg")
     txt_path = os.path.join(output_dir, f"{base_name}_summary.txt")
@@ -141,7 +119,7 @@ def save_parameter_figure(
     fig.savefig(svg_path, bbox_inches="tight")
     plt.close(fig)
 
-    # Write summary text file
+    # Write a text summary of the plotted settings
     with open(txt_path, "w", encoding="utf-8") as f:
         f.write(f"Figure: {base_name}\n")
         f.write(f"Varied parameter: {varied_name}\n\n")
@@ -169,17 +147,14 @@ def save_parameter_figure(
 # Main
 # ---------------------------
 def main():
-    # Output folder beside this script
+    # Create the output folder beside this script
     script_dir = os.path.dirname(os.path.abspath(__file__))
     output_dir = os.path.join(script_dir, "parameterFigures")
 
-    # Use the same x-range for all panels for easier comparison
+    # Use a common x-range across all panels
     common_t_max = 6.0
 
-    # -----------------------
-    # Panel B: vary t0
-    # fixed: lambda = 1, k = 1, pi = 1
-    # -----------------------
+    # Panel B: vary t0, with lambda = 1, k = 1, pi = 1
     t0_values = [0.0, 0.3, 0.6, 1.0, 1.4, 2.0]
     save_parameter_figure(
         output_dir=output_dir,
@@ -190,10 +165,7 @@ def main():
         t_max=common_t_max,
     )
 
-    # -----------------------
-    # Panel C: vary lambda
-    # fixed: t0 = 0, k = 1, pi = 1
-    # -----------------------
+    # Panel C: vary lambda, with t0 = 0, k = 1, pi = 1
     lambda_values = [0.5, 0.75, 1.0, 1.4, 2.0, 2.8]
     save_parameter_figure(
         output_dir=output_dir,
@@ -204,10 +176,7 @@ def main():
         t_max=common_t_max,
     )
 
-    # -----------------------
-    # Panel D: vary k
-    # fixed: t0 = 0, lambda = 1, pi = 1
-    # -----------------------
+    # Panel D: vary k, with t0 = 0, lambda = 1, pi = 1
     k_values = [0.4, 0.6, 0.8, 1.0, 1.3, 1.8, 3.0]
     save_parameter_figure(
         output_dir=output_dir,
@@ -218,10 +187,7 @@ def main():
         t_max=common_t_max,
     )
 
-    # -----------------------
-    # Panel E: vary pi
-    # fixed: t0 = 0, lambda = 1, k = 1
-    # -----------------------
+    # Panel E: vary pi, with t0 = 0, lambda = 1, k = 1
     pi_values = [0.2, 0.4, 0.6, 0.8, 1.0]
     save_parameter_figure(
         output_dir=output_dir,
