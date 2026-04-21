@@ -1,26 +1,26 @@
 # analysis_mulas.py
 # Mulas 2017 Stem Cell Reports
 # DOI: 10.1016/j.stemcr.2017.05.033
-# Data for Primitive Streak like Differentiations is from Fig 2 A
-# Data for Lateral Medoderm Differentiation is from Fig 2 C
-# Data for Definitive Endoderm Differentiation is from Fig 2 E
-# Data for Neural Differentiation is from Fig 2 K
+# Data for Primitive Streak-like Differentiation are from Fig 2A
+# Data for Lateral Mesoderm Differentiation are from Fig 2C
+# Data for Definitive Endoderm Differentiation are from Fig 2E
+# Data for Neural Differentiation are from Fig 2K
 #
-# For each LINEAGE, fit Weibull fraction model to Mean by Cell Status,
+# For each lineage, fit a Weibull fraction model to mean values by cell status,
 # compare characteristic timescale (lam), timing (t50), synchronicity (k),
-# and (if not fixed) pi across statuses, and plot data (mean±SD markers)
-# with overlaid model curves.
+# and, where free, pi across statuses, and plot mean ± SD data with fitted curves.
 #
 # NOTE:
-#    t0 is fixed to 0.0 for all fits.
-#    For lineages 'Neural' and 'Primitive Streak', pi is fixed to 1.0.
+#   - t0 is fixed to 0.0 for all fits
+#   - for lineages 'Neural' and 'Primitive Streak', pi is fixed to 1.0
 
 import os
+from pathlib import Path
+from itertools import combinations
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from pathlib import Path
-from itertools import combinations
 from scipy.stats import norm
 
 from cstk_fit import fit_weibull, fraction_population
@@ -34,11 +34,11 @@ OUT_DIR = Path("mulas2017stemCellReports")
 OUT_DIR.mkdir(exist_ok=True)
 
 LINEAGE_COL = "Lineage"
-GENE_COL    = "Gene"
-STATUS_COL  = "Cell Status"
-TIME_COL    = "Time"
-MEAN_COL    = "Mean"
-SD_COL      = "SD"
+GENE_COL = "Gene"
+STATUS_COL = "Cell Status"
+TIME_COL = "Time"
+MEAN_COL = "Mean"
+SD_COL = "SD"
 
 ALPHA = 0.05  # FDR threshold
 
@@ -75,7 +75,7 @@ def wald_p(diff, se):
 
 
 def bh_fdr(pvals):
-    """Benjamini–Hochberg adjusted q-values (NaNs preserved)."""
+    """Benjamini–Hochberg adjusted q-values. NaNs are preserved."""
     p = np.array([pv if np.isfinite(pv) else np.nan for pv in pvals], dtype=float)
     n = np.sum(np.isfinite(p))
 
@@ -100,8 +100,6 @@ def var_t50_from_cov_fixed_t0(p, cov, fitted_keys):
     Delta-method variance of t50 with t0 fixed to 0.
 
     t50 = lam * (ln 2)^(1/k)
-
-    Gradient is taken with respect to the free parameters in fitted_keys.
     """
     if cov is None:
         return np.nan
@@ -134,7 +132,7 @@ def safe_name(s: str) -> str:
 
 
 def extract_se(param_name, cov, fitted_keys):
-    """Extract the standard error of a scalar fitted parameter."""
+    """Extract the standard error of a fitted scalar parameter."""
     if (cov is None) or (param_name not in fitted_keys):
         return np.nan
 
@@ -148,9 +146,9 @@ def extract_se(param_name, cov, fitted_keys):
 
 def pairwise_table(summary, value_col, se_col, label_col="status"):
     """
-    Build a pairwise Wald table for a given fitted parameter or derived metric.
+    Build a pairwise Wald table for one fitted parameter or derived metric.
 
-    Assumes independence between estimates when forming the SE of the difference.
+    The SE of the difference is computed assuming independent fits.
     """
     rows = []
 
@@ -189,7 +187,7 @@ def pairwise_table(summary, value_col, se_col, label_col="status"):
 
 
 # -----------------------
-# Load & tidy
+# Load and tidy data
 # -----------------------
 df = pd.read_csv(DATA_PATH)
 
@@ -206,7 +204,7 @@ df = df[[LINEAGE_COL, GENE_COL, STATUS_COL, TIME_COL, MEAN_COL, SD_COL]].rename(
 
 df["time"] = pd.to_numeric(df["time"], errors="coerce")
 df["mean"] = pd.to_numeric(df["mean"], errors="coerce")
-df["sd"]   = pd.to_numeric(df["sd"], errors="coerce")
+df["sd"] = pd.to_numeric(df["sd"], errors="coerce")
 
 df = df.dropna(subset=["lineage", "gene", "status", "time", "mean"]).copy()
 
@@ -229,7 +227,7 @@ all_summ = []
 for lineage in lineages:
     sub_lin = df[df["lineage"] == lineage].copy()
 
-    # Decide whether pi is fixed for this lineage
+    # Fix pi only for lineages expected to approach 1
     lineage_pi_fixed = str(lineage).strip().lower() in {"neural", "primitive streak"}
 
     rows = []
@@ -249,7 +247,6 @@ for lineage in lineages:
             print(f"[{lineage}] skip {status_canon}: nearly constant y; cannot fit.")
             continue
 
-        # Fit with t0 fixed to 0; pi fixed only for specified lineages
         fit = fit_weibull(
             t,
             y,
@@ -260,7 +257,7 @@ for lineage in lineages:
             fix_pi=(1.0 if lineage_pi_fixed else None),
         )
 
-        # Free-parameter order used in fit
+        # Free-parameter order used in the fit
         fitted_keys = ["lam", "k"] + ([] if lineage_pi_fixed else ["pi"])
         p = fit.params
 
@@ -309,7 +306,7 @@ for lineage in lineages:
     # Pairwise statistics
     # -----------------------
 
-    # (i) Characteristic timescale (lam)
+    # Characteristic timescale (lam)
     lam_pairs = pairwise_table(summary, value_col="lam", se_col="lam_se", label_col="status")
     if not lam_pairs.empty:
         pvals = 2.0 * norm.sf(np.abs(lam_pairs["z"].astype(float)))
@@ -321,7 +318,7 @@ for lineage in lineages:
         lam_pairs.to_csv(lam_path, index=False)
         print("Saved:", lam_path)
 
-    # (ii) Time of differentiation (t50)
+    # Timing (t50)
     t50_pairs = pairwise_table(summary, value_col="t50", se_col="t50_se", label_col="status")
     if not t50_pairs.empty:
         pvals = 2.0 * norm.sf(np.abs(t50_pairs["z"].astype(float)))
@@ -333,7 +330,7 @@ for lineage in lineages:
         t50_pairs.to_csv(t50_path, index=False)
         print("Saved:", t50_path)
 
-    # (iii) Synchronicity (k)
+    # Synchronicity (k)
     k_pairs = pairwise_table(summary, value_col="k", se_col="k_se", label_col="status")
     if not k_pairs.empty:
         pvals = 2.0 * norm.sf(np.abs(k_pairs["z"].astype(float)))
@@ -345,7 +342,7 @@ for lineage in lineages:
         k_pairs.to_csv(k_path, index=False)
         print("Saved:", k_path)
 
-    # (iv) Competent fraction (pi), only when pi is free
+    # Competent fraction (pi), only when pi is free
     if not lineage_pi_fixed:
         pi_pairs = pairwise_table(summary, value_col="pi", se_col="pi_se", label_col="status")
         if not pi_pairs.empty:
@@ -396,7 +393,7 @@ for lineage in lineages:
     }
     base_palette = plt.rcParams["axes.prop_cycle"].by_key()["color"]
 
-    # Plot data
+    # Plot mean ± SD data
     for status_canon, sub in sub_lin.groupby("status_canon"):
         c = fixed_colors.get(status_canon, base_palette[hash(status_canon) % len(base_palette)])
 
@@ -430,9 +427,10 @@ for lineage in lineages:
         yfit = fraction_population(tgrid, row["t0"], row["lam"], row["k"], row["pi"])
         ax.plot(tgrid, yfit, color=c, lw=3.0, alpha=0.95, zorder=2)
 
+    # Keep the y-axis consistent across lineages
     y_all = pd.concat(
         [sub_lin["mean"], sub_lin["mean"] + sub_lin["sd"], sub_lin["mean"] - sub_lin["sd"]],
-        axis=0
+        axis=0,
     )
     pad = 0.05 * (y_max - y_min if y_max > y_min else 1.0)
     ax.set_ylim(y_min - pad, y_max + pad)
