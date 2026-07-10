@@ -3,13 +3,51 @@
 # Simulate three minimal transition topologies, estimate empirical cumulative
 # distribution and hazard functions, fit delayed Weibull curves, and save the
 # resulting figures and summary files in a local "topologyModelFigures" folder.
+#
+# Previously, the dashed curves in the CDF and hazard figures plotted the
+# analytic Markov solution (F_theory / haz_theory), NOT the fitted delayed
+# Weibull curves, despite the figure legend claiming otherwise. The Weibull
+# fit was computed (lam_hat, k_hat) and written to the summary, but never drawn.
+#
+# This version corrects that: the dashed curves are now the fitted Weibull CDF
+# and Weibull hazard, evaluated at (lam_hat, k_hat). The solid curves remain the
+# stochastic-simulation estimates (the ground truth), so the comparison shown is
+# now genuinely "simulation vs Weibull fit".
+#
+# The exact analytic Markov solution is retained and can be overlaid as a thin
+# dotted line by setting SHOW_EXACT_THEORY = True. Note that for the decreasing 
+# hazard (k<1) topology, the exact first-passage-time distribution is a finite 
+# sum of exponentials whose tail behaviour differs fundamentally from a Weibull; 
+# the divergence becomes visible when the time axis is extended (see 
+# EXTEND_DECREASING_TMAX below).
+#
+# The increasing-hazard analytic curve is now the EXACT hypoexponential
+# (convolution of the four exponential steps), replacing the previous gamma
+# moment-matched approximation.
+# ---------------------------------------------------------------------------
 
 import os
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from scipy.optimize import curve_fit
 from scipy.stats import gamma
+
+
+# ---------------------------
+# Revision switches
+# ---------------------------
+# Overlay the exact analytic Markov solution (thin dotted) alongside the Weibull
+# fit. Off by default so the main-text figure shows simulation vs Weibull fit
+# only (matching the two-curve legend). Turn on to generate the diagnostic /
+# supplemental version that also shows the exact solution.
+SHOW_EXACT_THEORY = False
+
+# Optionally extend the time axis for the decreasing-hazard panel only, to make
+# the long-time Weibull-vs-exact divergence visible. Set to None to keep the
+# common range. Example: 60.0
+EXTEND_DECREASING_TMAX = None
 
 
 # ---------------------------
@@ -46,6 +84,15 @@ def weibull_cdf(t, lam, k):
     out = np.zeros_like(t)
     mask = t >= 0
     out[mask] = 1.0 - np.exp(-((t[mask] / lam) ** k))
+    return out
+
+
+def weibull_hazard(t, lam, k):
+    """Standard Weibull hazard function h(t) = (k/lam) (t/lam)^(k-1)."""
+    t = np.asarray(t, dtype=float)
+    out = np.full_like(t, np.nan, dtype=float)
+    mask = t > 0
+    out[mask] = (k / lam) * (t[mask] / lam) ** (k - 1.0)
     return out
 
 
@@ -206,7 +253,7 @@ def simulate_decreasing_hazard(n, r_transition=2.2, r_adapt=1.6, r_refractory=0.
 
 
 # ---------------------------
-# Theory curves
+# Theory curves (exact analytic Markov solutions)
 # ---------------------------
 def theoretical_constant_cdf(t, r):
     """Exact CDF for the one-step topology."""
@@ -218,36 +265,59 @@ def theoretical_constant_hazard(t, r):
     return np.full_like(t, r, dtype=float)
 
 
+def _hypoexponential_coeffs(rates):
+    """
+    Partial-fraction coefficients for a hypoexponential (generalized Erlang)
+    distribution with DISTINCT rates. Returns c_i such that
+        S(t) = sum_i c_i exp(-rate_i t),  with sum_i c_i = 1.
+    """
+    rates = np.asarray(rates, dtype=float)
+    n = len(rates)
+    c = np.empty(n, dtype=float)
+    for i in range(n):
+        prod = 1.0
+        for j in range(n):
+            if j != i:
+                prod *= rates[j] / (rates[j] - rates[i])
+        c[i] = prod
+    return rates, c
+
+
 def theoretical_increasing_cdf(t, rates):
     """
-    Approximate CDF for the sequential topology using a moment-matched gamma distribution.
+    Exact CDF for the sequential topology (hypoexponential law), valid for
+    distinct rates. Falls back to an Erlang if all rates are equal.
     """
-    rates = np.array(rates, dtype=float)
-    if np.allclose(rates, rates[0]):
-        return gamma.cdf(t, a=len(rates), scale=1.0 / rates[0])
+    t = np.asarray(t, dtype=float)
+    rates_arr = np.asarray(rates, dtype=float)
+    if np.allclose(rates_arr, rates_arr[0]):
+        return gamma.cdf(t, a=len(rates_arr), scale=1.0 / rates_arr[0])
 
-    mean = np.sum(1.0 / rates)
-    var = np.sum(1.0 / rates**2)
-    shape = mean**2 / var
-    scale = var / mean
-    return gamma.cdf(t, a=shape, scale=scale)
+    r, c = _hypoexponential_coeffs(rates_arr)
+    S = np.zeros_like(t)
+    for ci, ri in zip(c, r):
+        S += ci * np.exp(-ri * t)
+    return np.clip(1.0 - S, 0.0, 1.0)
 
 
 def theoretical_increasing_hazard(t, rates):
     """
-    Approximate hazard for the sequential topology using a moment-matched gamma distribution.
+    Exact hazard for the sequential topology (hypoexponential law), valid for
+    distinct rates. Falls back to an Erlang if all rates are equal.
     """
-    rates = np.array(rates, dtype=float)
-    if np.allclose(rates, rates[0]):
-        pdf = gamma.pdf(t, a=len(rates), scale=1.0 / rates[0])
-        sf = gamma.sf(t, a=len(rates), scale=1.0 / rates[0])
+    t = np.asarray(t, dtype=float)
+    rates_arr = np.asarray(rates, dtype=float)
+    if np.allclose(rates_arr, rates_arr[0]):
+        pdf = gamma.pdf(t, a=len(rates_arr), scale=1.0 / rates_arr[0])
+        sf = gamma.sf(t, a=len(rates_arr), scale=1.0 / rates_arr[0])
     else:
-        mean = np.sum(1.0 / rates)
-        var = np.sum(1.0 / rates**2)
-        shape = mean**2 / var
-        scale = var / mean
-        pdf = gamma.pdf(t, a=shape, scale=scale)
-        sf = gamma.sf(t, a=shape, scale=scale)
+        r, c = _hypoexponential_coeffs(rates_arr)
+        sf = np.zeros_like(t)
+        pdf = np.zeros_like(t)
+        for ci, ri in zip(c, r):
+            e = np.exp(-ri * t)
+            sf += ci * e
+            pdf += ci * ri * e
 
     with np.errstate(divide="ignore", invalid="ignore"):
         haz = pdf / sf
@@ -299,19 +369,34 @@ def theoretical_decreasing_hazard(t, r_transition, r_adapt, r_refractory):
 # ---------------------------
 # Plotting
 # ---------------------------
+BASE_COLOURS = {
+    "Constant hazard (S→T)": (0.0000, 0.4470, 0.7410),
+    "Increasing hazard (S0→S1→S2→S3→T)": (0.8500, 0.3250, 0.0980),
+    "Decreasing hazard (S→R→T)": (0.4660, 0.6740, 0.1880),
+}
+
+
+def _curve_legend_handles():
+    """Neutral proxy handles explaining the solid/dashed(/dotted) curve meaning."""
+    handles = [
+        Line2D([0], [0], color="0.35", lw=2.2, linestyle="-", label="Stochastic simulation"),
+        Line2D([0], [0], color="0.10", lw=3.0, linestyle="--", label="Delayed Weibull fit"),
+    ]
+    if SHOW_EXACT_THEORY:
+        handles.append(
+            Line2D([0], [0], color="0.10", lw=1.4, linestyle=":", label="Exact Markov solution")
+        )
+    return handles
+
+
 def make_combined_cdf_figure(results, output_dir):
-    """Plot empirical and fitted CDF curves for all topologies."""
+    """Plot empirical CDF (solid) and fitted Weibull CDF (dashed) for all topologies."""
     fig, ax = plt.subplots(figsize=(7.0, 5.5))
 
-    base_colours = {
-        "Constant hazard (S→T)": (0.0000, 0.4470, 0.7410),
-        "Increasing hazard (S0→S1→S2→S3→T)": (0.8500, 0.3250, 0.0980),
-        "Decreasing hazard (S→R→T)": (0.4660, 0.6740, 0.1880),
-    }
-
+    x_max = 0.0
     for label, res in results.items():
-        emp_col = lighten_color(base_colours[label], factor=0.90)
-        theo_col = darken_color(base_colours[label], factor=0.62)
+        emp_col = lighten_color(BASE_COLOURS[label], factor=0.90)
+        fit_col = darken_color(BASE_COLOURS[label], factor=0.62)
 
         ax.fill_between(
             res["t_grid"],
@@ -321,56 +406,72 @@ def make_combined_cdf_figure(results, output_dir):
             alpha=0.16,
             linewidth=0,
         )
+        # Solid: stochastic-simulation estimate (ground truth)
         ax.plot(res["t_grid"], res["F_emp"], linewidth=2.2, color=emp_col, label=label)
-        ax.plot(res["t_grid"], res["F_theory"], linewidth=3.0, linestyle="--", color=theo_col)
+        # Dashed: FITTED delayed Weibull curve (the actual fit)
+        ax.plot(res["t_grid"], res["F_weibull"], linewidth=3.0, linestyle="--", color=fit_col)
+        # Optional dotted: exact analytic Markov solution
+        if SHOW_EXACT_THEORY:
+            ax.plot(res["t_grid"], res["F_theory"], linewidth=1.4, linestyle=":", color=fit_col)
+        x_max = max(x_max, res["t_max"])
 
     ax.grid(True)
-    ax.set_xlim(0, results["Constant hazard (S→T)"]["t_max"])
+    ax.set_xlim(0, x_max)
     ax.set_ylim(0, 1.05)
     ax.set_title("")
     ax.set_xlabel("")
     ax.set_ylabel("")
-    ax.legend(frameon=False, loc="lower right", fontsize=11)
-    fig.tight_layout()
 
+    topo_handles, topo_labels = ax.get_legend_handles_labels()
+    leg1 = ax.legend(topo_handles, topo_labels, frameon=False, loc="lower right", fontsize=11)
+    ax.add_artist(leg1)
+    ax.legend(handles=_curve_legend_handles(), frameon=False, loc="center right", fontsize=10)
+
+    fig.tight_layout()
     fig.savefig(os.path.join(output_dir, "topologyModel_CDFs.png"), dpi=300, bbox_inches="tight")
     fig.savefig(os.path.join(output_dir, "topologyModel_CDFs.svg"), bbox_inches="tight")
     plt.close(fig)
 
 
 def make_combined_hazard_figure(results, output_dir):
-    """Plot empirical and fitted hazard curves for all topologies."""
+    """Plot empirical hazard (solid) and fitted Weibull hazard (dashed) for all topologies."""
     fig, ax = plt.subplots(figsize=(7.0, 5.5))
 
-    base_colours = {
-        "Constant hazard (S→T)": (0.0000, 0.4470, 0.7410),
-        "Increasing hazard (S0→S1→S2→S3→T)": (0.8500, 0.3250, 0.0980),
-        "Decreasing hazard (S→R→T)": (0.4660, 0.6740, 0.1880),
-    }
-
+    y_max = 0.0
     for label, res in results.items():
-        emp_col = lighten_color(base_colours[label], factor=0.90)
-        theo_col = darken_color(base_colours[label], factor=0.62)
+        emp_col = lighten_color(BASE_COLOURS[label], factor=0.90)
+        fit_col = darken_color(BASE_COLOURS[label], factor=0.62)
 
         ax.fill_between(res["haz_t"], res["haz_lo"], res["haz_hi"], color=emp_col, alpha=0.16, linewidth=0)
+        # Solid: stochastic-simulation hazard estimate
         ax.plot(res["haz_t"], res["haz_emp"], linewidth=2.0, color=emp_col, label=label)
-        ax.plot(res["haz_t"], res["haz_theory"], linewidth=3.0, linestyle="--", color=theo_col)
+        # Dashed: FITTED delayed Weibull hazard
+        ax.plot(res["haz_t"], res["haz_weibull"], linewidth=3.0, linestyle="--", color=fit_col)
+        # Optional dotted: exact analytic Markov hazard
+        if SHOW_EXACT_THEORY:
+            ax.plot(res["haz_t"], res["haz_theory"], linewidth=1.4, linestyle=":", color=fit_col)
 
-    x_max = min(
-        results["Constant hazard (S→T)"]["haz_t"][-1],
-        results["Increasing hazard (S0→S1→S2→S3→T)"]["haz_t"][-1],
-        results["Decreasing hazard (S→R→T)"]["haz_t"][-1],
-    )
+        # y-scale from the (bounded) empirical hazards, so the k<1 Weibull spike
+        # near t=0 does not dominate the axis.
+        finite_emp = res["haz_emp"][np.isfinite(res["haz_emp"])]
+        if finite_emp.size:
+            y_max = max(y_max, np.nanmax(finite_emp))
+
+    x_max = min(res["haz_t"][-1] for res in results.values())
 
     ax.grid(True)
     ax.set_xlim(0, x_max)
-    ax.set_ylim(bottom=0)
+    ax.set_ylim(0, 1.15 * y_max if y_max > 0 else None)
     ax.set_title("")
     ax.set_xlabel("")
     ax.set_ylabel("")
-    ax.legend(frameon=False, loc="upper right", fontsize=11)
-    fig.tight_layout()
 
+    topo_handles, topo_labels = ax.get_legend_handles_labels()
+    leg1 = ax.legend(topo_handles, topo_labels, frameon=False, loc="upper right", fontsize=11)
+    ax.add_artist(leg1)
+    ax.legend(handles=_curve_legend_handles(), frameon=False, loc="center right", fontsize=10)
+
+    fig.tight_layout()
     fig.savefig(os.path.join(output_dir, "topologyModel_hazards.png"), dpi=300, bbox_inches="tight")
     fig.savefig(os.path.join(output_dir, "topologyModel_hazards.svg"), bbox_inches="tight")
     plt.close(fig)
@@ -417,10 +518,23 @@ def main():
     results = {}
 
     for label, times in panel_times.items():
-        t_grid = np.linspace(0, t_max, 800)
-        F_emp, F_lo, F_hi = empirical_cdf_with_ci(times, t_grid)
-        lam_hat, k_hat = fit_weibull_to_cdf(times, t_grid=t_grid)
+        # Per-panel plotting range (decreasing panel may be extended to expose
+        # the long-time Weibull-vs-exact divergence).
+        panel_tmax = t_max
+        if label == "Decreasing hazard (S→R→T)" and EXTEND_DECREASING_TMAX is not None:
+            panel_tmax = float(EXTEND_DECREASING_TMAX)
 
+        t_grid = np.linspace(0, panel_tmax, 800)
+        F_emp, F_lo, F_hi = empirical_cdf_with_ci(times, t_grid)
+
+        # Fit the delayed Weibull (t0 = 0, pi = 1 for these topologies) on a
+        # grid restricted to the common range, matching the reported fits.
+        lam_hat, k_hat = fit_weibull_to_cdf(times, t_grid=np.linspace(0, t_max, 800))
+
+        # Fitted Weibull curve — THIS is what should be plotted as the fit.
+        F_weibull = weibull_cdf(t_grid, lam_hat, k_hat)
+
+        # Exact analytic Markov solution (optional overlay only).
         if label == "Constant hazard (S→T)":
             F_theory = theoretical_constant_cdf(t_grid, r_const)
             hz_theory_full = theoretical_constant_hazard(t_grid, r_const)
@@ -433,13 +547,15 @@ def main():
 
         haz_est = estimate_hazard_with_ci(
             times,
-            t_max=t_max,
+            t_max=panel_tmax,
             n_bins=501,
             smooth_sigma=6.0,
             min_risk=0,
         )
 
         hz_theory = np.interp(haz_est["t"], t_grid, hz_theory_full)
+        # Fitted Weibull hazard on the hazard grid — the dashed hazard curve.
+        haz_weibull = weibull_hazard(haz_est["t"], lam_hat, k_hat)
 
         results[label] = {
             "times": times,
@@ -447,6 +563,7 @@ def main():
             "F_emp": F_emp,
             "F_lo": F_lo,
             "F_hi": F_hi,
+            "F_weibull": F_weibull,
             "F_theory": F_theory,
             "lam_hat": lam_hat,
             "k_hat": k_hat,
@@ -454,8 +571,9 @@ def main():
             "haz_emp": haz_est["haz"],
             "haz_lo": haz_est["lo"],
             "haz_hi": haz_est["hi"],
+            "haz_weibull": haz_weibull,
             "haz_theory": hz_theory,
-            "t_max": t_max,
+            "t_max": panel_tmax,
         }
 
     make_combined_cdf_figure(results, output_dir)
@@ -466,13 +584,22 @@ def main():
         f.write("Topology model simulation summary\n")
         f.write("================================\n\n")
         f.write(f"Number of simulated trajectories per model: {n_sim}\n")
-        f.write(f"Common plotting range: t in [0, {t_max}]\n\n")
+        f.write(f"Common plotting range: t in [0, {t_max}]\n")
+        f.write(f"SHOW_EXACT_THEORY = {SHOW_EXACT_THEORY}; EXTEND_DECREASING_TMAX = {EXTEND_DECREASING_TMAX}\n\n")
 
         f.write("Model definitions used\n")
         f.write("----------------------\n")
         f.write(f"Constant hazard: S -> T with rate r = {r_const}\n")
         f.write(f"Increasing hazard: S0 -> S1 -> S2 -> S3 -> T with rates = {rates_inc}\n")
         f.write(f"Decreasing hazard: S -> T with rate {r_tr}, S -> R with rate {r_ad}, R -> T with rate {r_ref}\n\n")
+
+        f.write("Curves plotted\n")
+        f.write("--------------\n")
+        f.write("  Solid  : stochastic-simulation estimate (empirical CDF / hazard)\n")
+        f.write("  Dashed : FITTED delayed Weibull curve, evaluated at (lambda_hat, k_hat)\n")
+        if SHOW_EXACT_THEORY:
+            f.write("  Dotted : exact analytic Markov solution (for comparison)\n")
+        f.write("\n")
 
         f.write("Empirical Weibull fits\n")
         f.write("----------------------\n")
@@ -485,14 +612,14 @@ def main():
         f.write("--------------------------\n")
         f.write("  piecewise hazard estimator\n")
         f.write("  95% pointwise approximate confidence bands\n")
-        f.write("  90 bins over [0,10]\n")
+        f.write("  501 bins over the plotting range\n")
         f.write("  Gaussian smoothing sigma = 6.0 bins\n")
-        f.write("  tail truncated where risk set < 5000\n\n")
+        f.write("  no risk-set truncation (min_risk = 0)\n\n")
 
-        f.write("Theory curves\n")
-        f.write("-------------\n")
+        f.write("Exact analytic solutions (used for optional dotted overlay)\n")
+        f.write("----------------------------------------------------------\n")
         f.write("  Constant hazard: exact exponential CDF and hazard\n")
-        f.write("  Increasing hazard: gamma moment-matched theoretical approximation\n")
+        f.write("  Increasing hazard: exact hypoexponential (convolution of the four steps)\n")
         f.write("  Decreasing hazard: exact CDF and hazard for S->T, S->R, R->T model\n")
 
     print(f"Saved outputs to: {output_dir}")
