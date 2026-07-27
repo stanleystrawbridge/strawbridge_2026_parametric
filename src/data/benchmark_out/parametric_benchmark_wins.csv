@@ -1,0 +1,36 @@
+dataset,series,n,pi_free,df_left,ic_comparable,best_model_aicc,weibull_delta_aicc,weibull_aicc_weight,weibull_r2,best_r2_model,r2_spread
+hanna,NGFP1,16,False,12,True,Weibull,0.0,0.5900201879271885,0.9958781266881197,Weibull,0.008518886498672273
+hanna,NGFP1-Lin28OE,8,False,4,True,Gompertz,6.581410229628993,0.03556788349283342,0.9890123705390067,Gompertz,0.0231677865417933
+hanna,NGFP1-NanogOE,7,False,3,True,Gompertz,2.243960506273808,0.1896537027398001,0.9283080979407461,Gompertz,0.05391914970089362
+hanna,NGFP1-p21KD,6,False,2,True,Gompertz,0.5081864536453224,0.27142672098455684,0.9855465093577009,Gompertz,0.008641859166868326
+hanna,NGFP1-p53KD,6,False,2,True,Weibull,0.0,0.36987653907130635,0.9957230589779957,Weibull,0.0038808567915146197
+leeb_main,Esrrb,5,True,0,False,(insufficient df),,,0.9949756427730906,Gompertz,0.008135559461607933
+leeb_main,Klf2,5,True,0,False,(insufficient df),,,0.9947642067593097,Gamma,0.018907882781840746
+leeb_main,Klf4,5,True,0,False,(insufficient df),,,0.9999820093873577,Weibull,5.259265669954605e-05
+leeb_main,Nanog,5,True,0,False,(insufficient df),,,0.9965939687478682,Gompertz,0.004799229009227246
+leeb_main,Tbx3,5,True,0,False,(insufficient df),,,0.9997705844844484,Gamma,0.0016550087330415852
+leeb_main,Tfcp2l1,5,True,0,False,(insufficient df),,,0.989047329498406,Gamma,0.021903623444525566
+leeb_s3c,Esrrb|siNeg,5,True,0,False,(insufficient df),,,0.9981202962880754,Log-normal,0.0044183171372249586
+leeb_s3c,Esrrb|siPum1,5,True,0,False,(insufficient df),,,0.9996013885601296,Gompertz,0.002358090852969452
+leeb_s3c,Klf2|siNeg,5,True,0,False,(insufficient df),,,0.9903051302595488,Log-logistic,4.2824168818400565e-05
+leeb_s3c,Klf2|siPum1,5,True,0,False,(insufficient df),,,0.9955997469968462,Log-logistic,3.101145794393023e-05
+leeb_s3c,Klf4|siNeg,5,True,0,False,(insufficient df),,,0.9991923885588365,Gompertz,0.0018787182926368606
+leeb_s3c,Klf4|siPum1,5,True,0,False,(insufficient df),,,0.9997435590931629,Gamma,0.003211655176242445
+leeb_s3c,Nanog|siNeg,5,True,0,False,(insufficient df),,,0.9958098779454905,Gamma,0.0029105665673837544
+leeb_s3c,Nanog|siPum1,5,True,0,False,(insufficient df),,,0.9890213162455191,Gompertz,0.0042732944389199945
+leeb_s3c,Tbx3|siNeg,5,True,0,False,(insufficient df),,,0.9991036179389439,Gamma,0.001425330236055622
+leeb_s3c,Tbx3|siPum1,5,True,0,False,(insufficient df),,,0.9994404165395847,Gompertz,0.0029078050128874544
+leeb_s3c,Tfcp2l1|siNeg,5,True,0,False,(insufficient df),,,0.9999793467134945,Log-normal,2.159759982323095e-05
+leeb_s3c,Tfcp2l1|siPum1,5,True,0,False,(insufficient df),,,0.9996397968461417,Log-logistic,9.448961852365212e-05
+mulas,Definitive Endoderm|2i,5,True,0,False,(insufficient df),,,0.9981380344067663,Log-logistic,0.000591740134492813
+mulas,Definitive Endoderm|Rex1-Hi,5,True,0,False,(insufficient df),,,0.9705293861354081,Log-normal,0.018488298210596943
+mulas,Definitive Endoderm|Rex1-Lo,5,True,0,False,(insufficient df),,,0.6927820387356396,Log-normal,0.1404432910604947
+mulas,Lateral Mesoderm|2i,5,True,0,False,(insufficient df),,,0.9999997955190083,Log-normal,4.003070498748151e-06
+mulas,Lateral Mesoderm|Rex1-Hi,5,True,0,False,(insufficient df),,,0.9199460012303995,Log-normal,0.036089030663974064
+mulas,Lateral Mesoderm|Rex1-Lo,5,True,0,False,(insufficient df),,,0.9966735907151483,Gompertz,0.013763501954226154
+mulas,Neural|2i,4,False,0,False,(insufficient df),,,0.8925325082237126,Log-normal,0.13197336659334669
+mulas,Neural|Rex1-Hi,4,False,0,False,(insufficient df),,,0.9015247038749084,Log-logistic,0.025105479848496426
+mulas,Neural|Rex1-Lo,4,False,0,False,(insufficient df),,,0.9782910792200286,Log-logistic,0.00737994595539837
+mulas,Primitive Streak|2i,3,False,-1,False,(insufficient df),,,0.9979444644267474,Weibull,1.3475066605650454e-05
+mulas,Primitive Streak|Rex1-Hi,3,False,-1,False,(insufficient df),,,0.9859733022075992,Log-normal,0.039359583449083746
+mulas,Primitive Streak|Rex1-Lo,3,False,-1,False,(insufficient df),,,0.903410910437351,Log-logistic,0.20025371716991758

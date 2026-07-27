@@ -3,12 +3,18 @@ Topology model simulation summary
 
 Number of simulated trajectories per model: 100000000
 Common plotting range: t in [0, 10.0]
+SHOW_EXACT_THEORY = False; EXTEND_DECREASING_TMAX = None
 
 Model definitions used
 ----------------------
 Constant hazard: S -> T with rate r = 1.0
 Increasing hazard: S0 -> S1 -> S2 -> S3 -> T with rates = (0.7, 0.9, 1.1, 1.3)
 Decreasing hazard: S -> T with rate 2.2, S -> R with rate 1.6, R -> T with rate 0.025
+
+Curves plotted
+--------------
+  Solid  : stochastic-simulation estimate (empirical CDF / hazard)
+  Dashed : FITTED delayed Weibull curve, evaluated at (lambda_hat, k_hat)
 
 Empirical Weibull fits
 ----------------------
@@ -28,12 +34,12 @@ Hazard estimation settings
 --------------------------
   piecewise hazard estimator
   95% pointwise approximate confidence bands
-  90 bins over [0,10]
+  501 bins over the plotting range
   Gaussian smoothing sigma = 6.0 bins
-  tail truncated where risk set < 5000
+  no risk-set truncation (min_risk = 0)
 
-Theory curves
--------------
+Exact analytic solutions (used for optional dotted overlay)
+----------------------------------------------------------
   Constant hazard: exact exponential CDF and hazard
-  Increasing hazard: gamma moment-matched theoretical approximation
+  Increasing hazard: exact hypoexponential (convolution of the four steps)
   Decreasing hazard: exact CDF and hazard for S->T, S->R, R->T model

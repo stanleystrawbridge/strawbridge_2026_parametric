@@ -1,0 +1,6 @@
+dataset,series,Gamma,Gompertz,Log-logistic,Log-normal,Weibull
+hanna,NGFP1,3.78,1.22,15.47,17.93,0.0
+hanna,NGFP1-Lin28OE,9.87,0.0,13.22,14.06,6.58
+hanna,NGFP1-NanogOE,3.01,0.0,4.91,4.98,2.24
+hanna,NGFP1-p21KD,0.91,0.0,3.01,2.98,0.51
+hanna,NGFP1-p53KD,0.48,0.95,3.87,3.78,0.0

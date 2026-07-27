@@ -1,0 +1,36 @@
+dataset,series,Gamma,Gompertz,Log-logistic,Log-normal,Weibull
+hanna,NGFP1,0.9948,0.9956,0.9892,0.9874,0.9959
+hanna,NGFP1-Lin28OE,0.9834,0.9952,0.9748,0.972,0.989
+hanna,NGFP1-NanogOE,0.9201,0.948,0.8951,0.8941,0.9283
+hanna,NGFP1-p21KD,0.9845,0.9867,0.9781,0.9782,0.9855
+hanna,NGFP1-p53KD,0.9954,0.995,0.9918,0.992,0.9957
+leeb_main,Esrrb,0.9944,0.9972,0.9891,0.989,0.995
+leeb_main,Klf2,0.9956,0.9767,0.9942,0.9942,0.9948
+leeb_main,Klf4,1.0,1.0,0.9999,1.0,1.0
+leeb_main,Nanog,0.9966,0.9972,0.9924,0.9928,0.9966
+leeb_main,Tbx3,0.9998,0.9982,0.9994,0.9996,0.9998
+leeb_main,Tfcp2l1,0.9902,0.9683,0.9884,0.9884,0.989
+leeb_s3c,Esrrb|siNeg,0.9988,0.9953,0.9995,0.9997,0.9981
+leeb_s3c,Esrrb|siPum1,0.9986,0.9998,0.9988,0.9975,0.9996
+leeb_s3c,Klf2|siNeg,0.9903,0.9903,0.9903,0.9903,0.9903
+leeb_s3c,Klf2|siPum1,0.9956,0.9956,0.9956,0.9956,0.9956
+leeb_s3c,Klf4|siNeg,0.999,0.9999,0.9986,0.998,0.9992
+leeb_s3c,Klf4|siPum1,0.9999,0.9967,0.9985,0.998,0.9997
+leeb_s3c,Nanog|siNeg,0.996,0.9931,0.9955,0.9951,0.9958
+leeb_s3c,Nanog|siPum1,0.9891,0.9898,0.9878,0.9855,0.989
+leeb_s3c,Tbx3|siNeg,0.9992,0.9978,0.9987,0.9987,0.9991
+leeb_s3c,Tbx3|siPum1,0.9986,0.9997,0.9977,0.9968,0.9994
+leeb_s3c,Tfcp2l1|siNeg,1.0,1.0,1.0,1.0,1.0
+leeb_s3c,Tfcp2l1|siPum1,0.9996,0.9996,0.9997,0.9997,0.9996
+mulas,Definitive Endoderm|2i,0.9978,0.998,0.9984,0.9983,0.9981
+mulas,Definitive Endoderm|Rex1-Hi,0.9838,0.97,0.9869,0.9884,0.9705
+mulas,Definitive Endoderm|Rex1-Lo,0.7258,0.6072,0.7083,0.7477,0.6928
+mulas,Lateral Mesoderm|2i,1.0,1.0,1.0,1.0,1.0
+mulas,Lateral Mesoderm|Rex1-Hi,0.9269,0.8965,0.923,0.9326,0.9199
+mulas,Lateral Mesoderm|Rex1-Lo,0.9888,0.9998,0.9919,0.986,0.9967
+mulas,Neural|2i,0.9474,0.8299,0.9452,0.9619,0.8925
+mulas,Neural|Rex1-Hi,0.9109,0.9015,0.9266,0.9163,0.9015
+mulas,Neural|Rex1-Lo,0.9822,0.9781,0.9855,0.9804,0.9783
+mulas,Primitive Streak|2i,0.9979,0.9979,0.9979,0.9979,0.9979
+mulas,Primitive Streak|Rex1-Hi,0.9946,0.9599,0.9985,0.9993,0.986
+mulas,Primitive Streak|Rex1-Lo,0.9411,0.7721,0.9723,0.954,0.9034
