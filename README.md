@@ -1,8 +1,8 @@
-# Parametric quantification and comparison of cell-state transition kinetics using failure-based modeling
+# Quantification and statistical comparison of cell-state transition kinetics using a parametric failure-based model
 
 Code, digitized data, and analysis outputs associated with the manuscript:
 
-**Strawbridge SE, Fletcher AG, Smith A.**  
+**Strawbridge SE and Fletcher AG**  
 *Parametric quantification and comparison of cell-state transition kinetics using failure-based modeling.*
 
 ## Overview
