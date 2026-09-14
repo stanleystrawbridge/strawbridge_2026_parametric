@@ -52,10 +52,12 @@ The repository includes:
 │   ├── mulas2017stemCellReports/
 │   ├── parameterFigures/
 │   ├── topologyModelFigures/
+│   ├── modelComparisonFigures/
 │   ├── analysis_hanna.py
 │   ├── analysis_leeb.py
 │   ├── analysis_mulas.py
 │   ├── benchmark_parametric.py
+│   ├── build_model_comparison_figure.py
 │   ├── cstk_fit.py
 │   ├── make_parameter_figures.py
 │   └── simulate_topology_models.py
@@ -225,6 +227,29 @@ For the Leeb and Hanna datasets, ordinary nonlinear least squares is used becaus
 
 The benchmarking outputs underpin Supplemental Table S4.
 
+### `src/build_model_comparison_figure.py`
+
+Generates the main-text visual model-comparison figure (Figure 7), which presents the benchmarking of Supplemental Table S4 in graphical form.
+
+The script imports `benchmark_parametric.py` and reuses its fitting conventions — the same competent-fraction (\(\pi\)) and onset (\(t_0\)) policy for each dataset — so that the plotted curves are identical to the fits summarised in Supplemental Table S4. For each representative series it overlays:
+
+- the fitted delayed Weibull;
+- the four alternative families (Gamma, log-normal, Gompertz, log-logistic);
+- the observed data, with error bars where standard deviations are available.
+
+Panels for which information-criterion comparison is well posed are annotated with per-model \(\Delta\)AICc; panels with too few time points relative to the number of fitted parameters are flagged as having AICc undefined, with the families shown to be visually near-indistinguishable.
+
+The representative series are arranged to span the range of outcomes:
+
+- reprogramming series (Hanna) in which the delayed Weibull is best-supported (NGFP1), statistically tied with the Gompertz (p21-KD), and out-performed by the Gompertz (Lin28-OE);
+- sparsely sampled bulk (Leeb) and directed-differentiation (Mulas) series in which the families cannot be distinguished.
+
+Input data are read from the directory given by the `BENCH_DATA_DIR` environment variable, which defaults to `src/data` (the same data used by the benchmark). Figure files (PNG and PDF) are written to:
+
+```text
+src/modelComparisonFigures/
+```
+
 ## Input data
 
 Digitized input data are stored in:
@@ -307,8 +332,25 @@ The principal output files are:
 ```text
 parametric_benchmark_long.csv
 parametric_benchmark_wins.csv
-parametric_benchmark_featured.csv
+parametric_benchmark_deltaAICc.csv
+parametric_benchmark_R2.csv
 ```
+
+### Generating the model-comparison figure
+
+`build_model_comparison_figure.py` produces the main-text visual model comparison (Figure 7). It imports `benchmark_parametric.py` and reuses its fits, reading the same input data via `BENCH_DATA_DIR` (which defaults to `src/data`). From the `src` directory:
+
+```bash
+python build_model_comparison_figure.py
+```
+
+The figure (PNG and PDF) is written to:
+
+```text
+src/modelComparisonFigures/
+```
+
+The figure uses Arial where available, falling back to Helvetica and then to a generic sans-serif font.
 
 ## Software requirements
 
