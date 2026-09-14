@@ -1,6 +1,6 @@
 # build_model_comparison_figure.py
 #
-# Main-text visual model comparison : representative fits of all
+# Main-text visual model comparison: representative fits of all
 # five parametric families overlaid on the data, spanning the full range of
 # information-criterion outcomes. Reuses the exact fits from
 # benchmark_parametric.py, so curves match Supplemental Table S4.
@@ -10,7 +10,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-os.environ.setdefault("BENCH_DATA_DIR", "/mnt/user-data/uploads")
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+os.environ.setdefault("BENCH_DATA_DIR", os.path.join(_SCRIPT_DIR, "data"))
 import benchmark_parametric as bp
 
 plt.rcParams.update({
@@ -102,6 +103,8 @@ handles = ([Line2D([0], [0], marker="o", ls="none", ms=5, color="0.25", label="D
 fig.legend(handles=handles, loc="upper center", ncol=6, frameon=False, fontsize=10,
            bbox_to_anchor=(0.5, 1.005))
 fig.tight_layout(rect=[0, 0, 1, 0.955])
-fig.savefig("/mnt/user-data/outputs/figure_model_comparison.png", dpi=200, bbox_inches="tight")
-fig.savefig("/mnt/user-data/outputs/figure_model_comparison.pdf", bbox_inches="tight")
-print("saved 2x3 figure")
+_OUTDIR = os.path.join(_SCRIPT_DIR, "modelComparisonFigures")
+os.makedirs(_OUTDIR, exist_ok=True)
+fig.savefig(os.path.join(_OUTDIR, "figure_model_comparison.png"), dpi=200, bbox_inches="tight")
+fig.savefig(os.path.join(_OUTDIR, "figure_model_comparison.pdf"), bbox_inches="tight")
+print(f"saved 2x3 figure to {_OUTDIR}")
